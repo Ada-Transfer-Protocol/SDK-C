@@ -1,119 +1,91 @@
 # AdaTP C SDK
 
-A high-performance, lightweight C client for the Ada Transport Protocol (AdaTP), utilizing OpenSSL for cryptographic primitives.
+A high-performance C11 client library for the **Ada Transfer Protocol (AdaTP)**. Designed for embedded systems and performant native applications, this SDK provides direct access to the binary protocol with full encryption support.
 
-## Features
+## 📦 Features
+*   **Performance:** written in pure C11 with minimal overhead.
+*   **Security:** Uses OpenSSL `libcrypto` and `libssl` for X25519/AES-GCM.
+*   **Portability:** Tested on macOS (Clang) and Linux (GCC).
 
-- **Native Performance**: Written in pure C99 for maximum efficiency.
-- **Secure by Default**: Uses OpenSSL's EVP API for X25519, HKDF, and AES-256-GCM.
-- **Low Footprint**: Minimal dependency tree (only OpenSSL required).
-- **Portable**: Can be compiled on Linux, macOS, and Windows (with MSVC/MinGW).
-- **Protocol Compliant**: Fully compatible with the official AdaTP Rust server.
+## 🚀 Installation & Build
 
-## Requirements
+**Prerequisites:**
+*   CMake (optional) or GCC/Clang
+*   OpenSSL (`libssl-dev` or `openssl@3`)
 
-- C Compiler (GCC, Clang, MSVC)
-- CMake (3.10+) or Make
-- OpenSSL Development Libraries (3.0+ recommended)
-  - Ubuntu: `libssl-dev`
-  - macOS: `openssl@3` (via Homebrew)
-  - Fedora: `openssl-devel`
-
-## Building
-
-### Using CMake
+**Compiling with GCC:**
 
 ```bash
-mkdir build
-cd build
-cmake ..
-make
+# Example compile command for macOS (Homebrew OpenSSL)
+gcc -I include -I/opt/homebrew/include -I/usr/local/include \
+    src/client.c src/packet.c src/crypto.c example.c \
+    -L/opt/homebrew/lib -L/usr/local/lib -lssl -lcrypto -o adatp_chat
 ```
 
-### Manual Compilation
+## 🛠️ Usage
 
-```bash
-gcc -o adatp_client \
-    examples/example.c \
-    src/client.c \
-    src/packet.c \
-    src/crypto.c \
-    -I include -I src \
-    -lssl -lcrypto
-```
-
-*Note: On macOS with Homebrew, you may need to specify include/lib paths:*
-
-```bash
-gcc -o adatp_client ... \
-    -I /opt/homebrew/opt/openssl@3/include \
-    -L /opt/homebrew/opt/openssl@3/lib \
-    -lssl -lcrypto
-```
-
-## Usage
+### 1. Basic Chat Client
 
 ```c
 #include "adatp.h"
-#include <stdio.h>
 
 int main() {
-    // Create client instance for localhost:8443
-    adatp_client_t* client = adatp_client_create("127.0.0.1", 8443);
+    // 1. Create Handle
+    adatp_client_t* client = adatp_client_create("127.0.0.1", 8444);
     
-    // Connect and perform Handshake
-    if (adatp_client_connect(client) == 0) {
-        printf("Secure connection established!\n");
-        
-        // Send encrypted message and wait for echo
-        adatp_client_send_text(client, "Hello from C!");
-        
-        // Disconnect
-        adatp_client_disconnect(client);
-    } else {
-        printf("Connection failed.\n");
+    // 2. Connect
+    if (adatp_client_connect(client) != 0) {
+        printf("Connection Failed\n");
+        return 1;
     }
-    
-    // Cleanup
+
+    // 3. Authenticate
+    adatp_client_authenticate(client, "user", "pass");
+
+    // 4. Send Message
+    adatp_client_send_text(client, "Hello from C!");
+
+    // 5. Read Packet
+    adatp_packet_t pkt;
+    if (adatp_client_read_packet(client, &pkt) == 0) {
+        if (pkt.header.msg_type == ADATP_MSG_TEXT_MESSAGE) {
+            uint8_t buffer[1024];
+            int len = adatp_client_decrypt_packet(client, &pkt, buffer);
+            if(len > 0) {
+                buffer[len] = 0;
+                printf("Received: %s\n", buffer);
+            }
+        }
+    }
+
+    // 6. Cleanup
     adatp_client_destroy(client);
     return 0;
 }
 ```
 
-## API Reference
+### 2. File Transfer
 
-### Management
+File transfers in C require manual construction of the protocol payloads (`INIT`, `CHUNK`, `COMPLETE`) if not using high-level helpers.
 
-- `adatp_client_create(host, port)`: Allocates a new client.
-- `adatp_client_destroy(client)`: Frees the client resources.
+The typical flow:
+1.  **FILE_INIT:** Send JSON metadata.
+2.  **FILE_CHUNK:** Send UUID (16 bytes) + Data Chunk.
+3.  **FILE_COMPLETE:** Send UUID (16 bytes).
 
-### Connection
+See `filetransfer_example.c` for a raw implementation of this packet construction.
 
-- `adatp_client_connect(client)`: Connects via TCP and executes the X25519/HKDF handshake. Returns 0 on success.
-- `adatp_client_disconnect(client)`: Sends a DISCONNECT packet and closes the socket.
+## 📂 Examples
 
-### Messaging
+*   **Chat CLI:** `example.c`
+    *   Implements `select()` to multiplex `stdin` (user input) and the TCP socket for real-time chat.
+*   **File Sender:** `filetransfer_example.c`
+    *   Demonstrates manually constructing the binary payloads required to upload a file to the room.
 
-- `adatp_client_send_text(client, text)`: Encrypts and sends a text message. Blocks until sent.
-- `adatp_client_join_room(client, room)`: Encrypts and sends a join room command. (0x00A0).
+## 🔧 API Reference
 
-### Multi-Room Support
-
-```c
-adatp_client_join_room(client, "meeting_room");
-```
-## Protocol Support
-
-| Feature | Status |
-|---------|--------|
-| Handshake (X25519) | ✅ |
-| Encryption (AES-GCM) | ✅ |
-| Text Messages | ✅ |
-| Multi-Room Chat | ✅ |
-| File Transfer | ✅ (Implemented) |
-| Voice/Video | 🚧 (Planned) |
-
-## License
-
-MIT
-# SDK-C
+*   `adatp_client_create(host, port)`: Allocate client context.
+*   `adatp_client_connect(client)`: Perform TCP handshake + Crypto handshake.
+*   `adatp_client_authenticate(client, user, pass)`: Send auth packet.
+*   `adatp_client_send_text(client, msg)`: Helper for text messages.
+*   `adatp_client_send(client, type, payload, len)`: Send raw encrypted packet.
