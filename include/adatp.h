@@ -28,6 +28,15 @@ typedef enum {
     ADATP_MSG_FILE_COMPLETE = 0x0033,
     ADATP_MSG_FILE_CANCEL = 0x0034,
 
+    ADATP_MSG_GAME_STATE = 0x0050,
+
+    ADATP_MSG_TOOL_CALL = 0x0070,
+    ADATP_MSG_TOOL_RESULT = 0x0071,
+    ADATP_MSG_TOOL_ERROR = 0x0072,
+
+    ADATP_MSG_PING = 0x0080,
+    ADATP_MSG_PONG = 0x0081,
+
     ADATP_MSG_JOIN_ROOM = 0x00A0,
     ADATP_MSG_ROOM_JOINED = 0x00A1,
     ADATP_MSG_DISCONNECT = 0x00FF
@@ -64,6 +73,11 @@ typedef struct adatp_client adatp_client_t;
 // Create and destroy client
 adatp_client_t* adatp_client_create(const char* host, int port);
 void adatp_client_destroy(adatp_client_t* client);
+
+// SDK language (client-side metadata; the wire protocol is language-neutral).
+// Supported codes: en tr it fr de zh ja hi ar. Unknown codes fall back to "en".
+void adatp_client_set_locale(adatp_client_t* client, const char* locale);
+const char* adatp_client_get_locale(const adatp_client_t* client);
 
 // Connection
 int adatp_client_connect(adatp_client_t* client);

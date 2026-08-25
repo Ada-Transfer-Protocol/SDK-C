@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
     }
     if (strlen(password) == 0) strcpy(password, "secret_password");
 
-    adatp_client_t* client = adatp_client_create("127.0.0.1", 8444);
+    adatp_client_t* client = adatp_client_create("127.0.0.1", 3000);
     
     printf("Connecting...\n");
     if (adatp_client_connect(client) != 0) {
