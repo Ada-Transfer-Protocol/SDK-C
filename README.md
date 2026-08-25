@@ -8,6 +8,34 @@ A high-performance C11 client library for the **Ada Transfer Protocol (AdaTP)**.
 *   **Performance:** written in pure C11 with minimal overhead.
 *   **Security:** Uses OpenSSL `libcrypto` and `libssl` for X25519/AES-GCM.
 *   **Portability:** Tested on macOS (Clang) and Linux (GCC).
+*   **Authenticated handshake (protocol v2):** pin the server's Ed25519 key to get
+    an authenticated, MITM-resistant handshake with header-AAD — no TLS required
+    for that guarantee (opt-in; v1 stays the default and unchanged).
+
+## 🔐 Authenticated handshake (v2)
+
+By default the client runs the v1 (unauthenticated) handshake, which relies on
+TLS at the edge for server authentication. Pinning the server's long-term
+Ed25519 identity switches to **protocol v2**: the client verifies the server's
+signature over the handshake transcript (and binds the frame header as AEAD AAD)
+**before** deriving any key, defeating an active man-in-the-middle even without
+TLS.
+
+```c
+adatp_client_t* client = adatp_client_create("127.0.0.1", 3000);
+
+// The server's 32-byte Ed25519 public key, obtained out of band (the server
+// logs its fingerprint at startup; the control plane can hand it to clients).
+uint8_t server_key[32] = { /* ... */ };
+adatp_client_set_server_key(client, server_key);   // <-- enables v2 + pinning
+
+adatp_client_connect(client);   // authenticated handshake; aborts on a bad key/signature
+```
+
+Verified against the Rust reference server end to end (`test/run_e2e_v2.sh`) and
+by golden-vector conformance (`ctest`, `test/conformance_v2.c`). Require v2
+server-side with `ADATP_MIN_PROTOCOL_VERSION=2`. See
+[`docs/spec/12-authenticated-handshake.md`](https://github.com/Ada-Transfer-Protocol/Server/blob/main/docs/spec/12-authenticated-handshake.md).
 
 ## 🚀 Installation & Build
 

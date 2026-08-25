@@ -76,25 +76,31 @@ static void compute_iv(uint8_t* iv, const uint8_t* root, uint64_t seq) {
     }
 }
 
-int crypto_encrypt_gcm(secure_session_t *session, const uint8_t *plaintext, size_t plen, 
+int crypto_encrypt_gcm(secure_session_t *session, const uint8_t *plaintext, size_t plen,
+                       const uint8_t *aad, size_t aad_len,
                        uint8_t *ciphertext, uint8_t *tag, uint64_t *out_seq) {
     *out_seq = session->my_sequence;
-    
+
     uint8_t iv[12];
     const uint8_t *key = (session->role == 0) ? session->client_write_key : session->server_write_key;
     const uint8_t *iv_root = (session->role == 0) ? session->client_iv_root : session->server_iv_root;
-    
+
     compute_iv(iv, iv_root, *out_seq);
-    
+
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if(!ctx) return 0;
-    
+
     int len;
     int ciphertext_len;
-    
+
     if(EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL) != 1) goto err;
     if(EVP_EncryptInit_ex(ctx, NULL, NULL, key, iv) != 1) goto err;
-    
+
+    // v2 binds the frame header as AEAD AAD (v1 passes aad_len 0 = empty AAD).
+    if(aad && aad_len > 0) {
+        if(EVP_EncryptUpdate(ctx, NULL, &len, aad, (int)aad_len) != 1) goto err;
+    }
+
     if(EVP_EncryptUpdate(ctx, ciphertext, &len, plaintext, plen) != 1) goto err;
     ciphertext_len = len;
     
@@ -111,25 +117,31 @@ err:
     return -1;
 }
 
-int crypto_decrypt_gcm(secure_session_t *session, const uint8_t *ciphertext, size_t clen, 
+int crypto_decrypt_gcm(secure_session_t *session, const uint8_t *ciphertext, size_t clen,
+                       const uint8_t *aad, size_t aad_len,
                        const uint8_t *tag, uint64_t seq, uint8_t *plaintext) {
-    
+
     uint8_t iv[12];
     // Peer's role is opposite
     const uint8_t *key = (session->role == 0) ? session->server_write_key : session->client_write_key;
     const uint8_t *iv_root = (session->role == 0) ? session->server_iv_root : session->client_iv_root;
-    
+
     compute_iv(iv, iv_root, seq);
-    
+
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if(!ctx) return 0;
-    
+
     int len;
     int plaintext_len;
-    
+
     if(EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, NULL, NULL) != 1) goto err;
     if(EVP_DecryptInit_ex(ctx, NULL, NULL, key, iv) != 1) goto err;
-    
+
+    // v2: bind the received header as AAD before the ciphertext.
+    if(aad && aad_len > 0) {
+        if(EVP_DecryptUpdate(ctx, NULL, &len, aad, (int)aad_len) != 1) goto err;
+    }
+
     if(EVP_DecryptUpdate(ctx, plaintext, &len, ciphertext, clen) != 1) goto err;
     plaintext_len = len;
     
@@ -148,4 +160,38 @@ int crypto_decrypt_gcm(secure_session_t *session, const uint8_t *ciphertext, siz
 err:
     EVP_CIPHER_CTX_free(ctx);
     return -1;
+}
+
+// --- Protocol v2 helpers (authenticated handshake) ---
+
+// SHA-256 of `data` into out[32]. Used for the v2 transcript hash.
+int crypto_sha256(const uint8_t *data, size_t len, uint8_t out[32]) {
+    unsigned int outlen = 32;
+    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+    if (!ctx) return 0;
+    int ok = EVP_DigestInit_ex(ctx, EVP_sha256(), NULL) == 1
+          && EVP_DigestUpdate(ctx, data, len) == 1
+          && EVP_DigestFinal_ex(ctx, out, &outlen) == 1;
+    EVP_MD_CTX_free(ctx);
+    return ok ? 1 : 0;
+}
+
+// Verify an Ed25519 signature (sig[64]) over msg under the raw public key
+// pub[32]. Returns 1 on a valid signature, 0 otherwise. This is the check that
+// authenticates the v2 server: the client runs it over the pinned key.
+int crypto_ed25519_verify(const uint8_t pub[32], const uint8_t *msg, size_t msglen,
+                          const uint8_t sig[64]) {
+    EVP_PKEY *key = EVP_PKEY_new_raw_public_key(EVP_PKEY_ED25519, NULL, pub, 32);
+    if (!key) return 0;
+    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+    if (!ctx) { EVP_PKEY_free(key); return 0; }
+    int ok = 0;
+    // Ed25519 is a one-shot (PureEdDSA) scheme: md is NULL and we call the
+    // single-shot EVP_DigestVerify, never the streaming Update/Final.
+    if (EVP_DigestVerifyInit(ctx, NULL, NULL, NULL, key) == 1) {
+        ok = (EVP_DigestVerify(ctx, sig, 64, msg, msglen) == 1);
+    }
+    EVP_MD_CTX_free(ctx);
+    EVP_PKEY_free(key);
+    return ok ? 1 : 0;
 }
