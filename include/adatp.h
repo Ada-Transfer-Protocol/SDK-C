@@ -79,6 +79,14 @@ void adatp_client_destroy(adatp_client_t* client);
 void adatp_client_set_locale(adatp_client_t* client, const char* locale);
 const char* adatp_client_get_locale(const adatp_client_t* client);
 
+// Pin the server's long-term Ed25519 identity public key (32 bytes). Calling
+// this BEFORE connect() switches the handshake to the authenticated protocol
+// v2: the client verifies the server's signature over the transcript (and binds
+// the frame header as AEAD AAD) before deriving any key, defeating an active
+// man-in-the-middle even without TLS. Without it, the v1 (unauthenticated)
+// handshake is used and TLS is required for that guarantee.
+void adatp_client_set_server_key(adatp_client_t* client, const uint8_t server_key[32]);
+
 // Connection
 int adatp_client_connect(adatp_client_t* client);
 void adatp_client_disconnect(adatp_client_t* client);
