@@ -17,7 +17,7 @@ int main() {
     printf("C File Transfer Example (Sender Only)\n");
     
     // Use adatp_client_create (Heap Ptr) instead of stack allocation (Incomplete Type)
-    adatp_client_t* client = adatp_client_create("127.0.0.1", 8444);
+    adatp_client_t* client = adatp_client_create("127.0.0.1", 3000);
     if (!client) {
         printf("Failed to create client\n");
         return 1;

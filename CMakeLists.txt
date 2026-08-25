@@ -14,6 +14,7 @@ include_directories(include)
 set(SOURCES
     src/packet.c
     src/crypto.c
+    src/ws.c
     src/client.c
 )
 

@@ -2,6 +2,8 @@
 
 A high-performance C11 client library for the **Ada Transfer Protocol (AdaTP)**. Designed for embedded systems and performant native applications, this SDK provides direct access to the binary protocol with full encryption support.
 
+**Transport:** WebSocket (`ws://<host>:3000/ws` by default) with a built-in dependency-free RFC 6455 client. TLS (`wss://`) is expected to be terminated by a proxy/load balancer in front of the server.
+
 ## 📦 Features
 *   **Performance:** written in pure C11 with minimal overhead.
 *   **Security:** Uses OpenSSL `libcrypto` and `libssl` for X25519/AES-GCM.
@@ -31,7 +33,7 @@ gcc -I include -I/opt/homebrew/include -I/usr/local/include \
 
 int main() {
     // 1. Create Handle
-    adatp_client_t* client = adatp_client_create("127.0.0.1", 8444);
+    adatp_client_t* client = adatp_client_create("127.0.0.1", 3000);
     
     // 2. Connect
     if (adatp_client_connect(client) != 0) {
@@ -78,14 +80,14 @@ See `filetransfer_example.c` for a raw implementation of this packet constructio
 ## 📂 Examples
 
 *   **Chat CLI:** `example.c`
-    *   Implements `select()` to multiplex `stdin` (user input) and the TCP socket for real-time chat.
+    *   Implements `select()` to multiplex `stdin` (user input) and the WebSocket file descriptor for real-time chat.
 *   **File Sender:** `filetransfer_example.c`
     *   Demonstrates manually constructing the binary payloads required to upload a file to the room.
 
 ## 🔧 API Reference
 
 *   `adatp_client_create(host, port)`: Allocate client context.
-*   `adatp_client_connect(client)`: Perform TCP handshake + Crypto handshake.
+*   `adatp_client_connect(client)`: Connect over WebSocket (/ws) + crypto handshake.
 *   `adatp_client_authenticate(client, user, pass)`: Send auth packet.
 *   `adatp_client_send_text(client, msg)`: Helper for text messages.
 *   `adatp_client_send(client, type, payload, len)`: Send raw encrypted packet.

@@ -24,7 +24,7 @@ int main(int argc, char* argv[]) {
         username[strcspn(username, "\n")] = 0; // Remove newline
     }
     
-    adatp_client_t* client = adatp_client_create("127.0.0.1", 8443);
+    adatp_client_t* client = adatp_client_create("127.0.0.1", 3000);
     
     printf("Connecting...\n");
     if (adatp_client_connect(client) != 0) {
