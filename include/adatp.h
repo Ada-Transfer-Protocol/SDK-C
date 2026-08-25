@@ -74,6 +74,11 @@ typedef struct adatp_client adatp_client_t;
 adatp_client_t* adatp_client_create(const char* host, int port);
 void adatp_client_destroy(adatp_client_t* client);
 
+// SDK language (client-side metadata; the wire protocol is language-neutral).
+// Supported codes: en tr it fr de zh ja hi ar. Unknown codes fall back to "en".
+void adatp_client_set_locale(adatp_client_t* client, const char* locale);
+const char* adatp_client_get_locale(const adatp_client_t* client);
+
 // Connection
 int adatp_client_connect(adatp_client_t* client);
 void adatp_client_disconnect(adatp_client_t* client);

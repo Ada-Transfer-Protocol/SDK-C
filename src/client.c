@@ -14,7 +14,27 @@ struct adatp_client {
     int connected;
     secure_session_t session;
     uint8_t session_id[16];
+    char locale[6]; // SDK language, e.g. "en", "tr"
 };
+
+static const char* ADATP_SDK_LOCALES[] = {
+    "en", "tr", "it", "fr", "de", "zh", "ja", "hi", "ar", NULL,
+};
+
+void adatp_client_set_locale(adatp_client_t* client, const char* locale) {
+    if (!client) return;
+    const char* chosen = "en";
+    if (locale) {
+        for (int i = 0; ADATP_SDK_LOCALES[i]; i++) {
+            if (strcmp(ADATP_SDK_LOCALES[i], locale) == 0) { chosen = ADATP_SDK_LOCALES[i]; break; }
+        }
+    }
+    snprintf(client->locale, sizeof(client->locale), "%s", chosen);
+}
+
+const char* adatp_client_get_locale(const adatp_client_t* client) {
+    return client && client->locale[0] ? client->locale : "en";
+}
 
 adatp_client_t* adatp_client_create(const char* host, int port) {
     adatp_client_t* client = calloc(1, sizeof(adatp_client_t));
@@ -22,6 +42,7 @@ adatp_client_t* adatp_client_create(const char* host, int port) {
     client->host = strdup(host);
     client->port = port > 0 ? port : 3000;
     client->path = strdup("/ws");
+    snprintf(client->locale, sizeof(client->locale), "en");
     client->ws = NULL;
     client->connected = 0;
     RAND_bytes(client->session_id, 16);

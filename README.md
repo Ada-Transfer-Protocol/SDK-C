@@ -91,3 +91,15 @@ See `filetransfer_example.c` for a raw implementation of this packet constructio
 *   `adatp_client_authenticate(client, user, pass)`: Send auth packet.
 *   `adatp_client_send_text(client, msg)`: Helper for text messages.
 *   `adatp_client_send(client, type, payload, len)`: Send raw encrypted packet.
+
+## Language / locale
+
+Set the SDK language for user-facing strings (client-side metadata — the
+wire protocol is language-neutral). Default `en`; supported:
+`en tr it fr de zh ja hi ar`.
+
+```c
+adatp_client_t* client = adatp_client_create("127.0.0.1", 3000);
+adatp_client_set_locale(client, "tr");
+const char* lang = adatp_client_get_locale(client);
+```
