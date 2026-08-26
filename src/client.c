@@ -403,10 +403,7 @@ static int send_encrypted(adatp_client_t* client, uint16_t type,
     return send_raw_packet(client, &pkt);
 }
 
-int adatp_client_authenticate(adatp_client_t* client, const char* username, const char* password) {
-    char json[512];
-    snprintf(json, sizeof(json), "{\"username\": \"%s\", \"password\": \"%s\"}", username, password);
-
+static int do_auth(adatp_client_t* client, const char* json) {
     if (send_encrypted(client, ADATP_MSG_AUTH_REQUEST, (uint8_t*)json, strlen(json)) != 0) return -1;
 
     adatp_packet_t resp;
@@ -425,6 +422,20 @@ int adatp_client_authenticate(adatp_client_t* client, const char* username, cons
     }
     printf("Auth failed: %s\n", plain);
     return -4;
+}
+
+int adatp_client_authenticate(adatp_client_t* client, const char* username, const char* password) {
+    char json[512];
+    snprintf(json, sizeof(json), "{\"username\": \"%s\", \"password\": \"%s\"}", username, password);
+    return do_auth(client, json);
+}
+
+// Authenticate with a single credential string (token/session/API key) instead
+// of username+password — for servers whose auth mode expects an auth_string.
+int adatp_client_authenticate_string(adatp_client_t* client, const char* auth_string) {
+    char json[512];
+    snprintf(json, sizeof(json), "{\"auth_string\": \"%s\"}", auth_string);
+    return do_auth(client, json);
 }
 
 int adatp_client_join_room(adatp_client_t* client, const char* room) {

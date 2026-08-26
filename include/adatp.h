@@ -96,6 +96,9 @@ int adatp_client_send_text(adatp_client_t* client, const char* text);
 int adatp_client_send(adatp_client_t* client, adatp_msg_type_t type, const uint8_t* payload, size_t len);
 int adatp_client_join_room(adatp_client_t* client, const char* room);
 int adatp_client_authenticate(adatp_client_t* client, const char* username, const char* password);
+// Authenticate with a single credential string (token/session/API key) instead
+// of username+password — for servers whose auth mode expects an auth_string.
+int adatp_client_authenticate_string(adatp_client_t* client, const char* auth_string);
 int adatp_client_read_packet(adatp_client_t* client, adatp_packet_t* packet);
 int adatp_client_get_socket(adatp_client_t* client);
 int adatp_client_decrypt_packet(adatp_client_t* client, const adatp_packet_t* packet, uint8_t* out_buf);
