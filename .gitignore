@@ -7,3 +7,4 @@ adatp_example
 c_file_transfer
 make_build
 cmake-build-debug/
+.omc/

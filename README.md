@@ -2,10 +2,40 @@
 
 A high-performance C11 client library for the **Ada Transfer Protocol (AdaTP)**. Designed for embedded systems and performant native applications, this SDK provides direct access to the binary protocol with full encryption support.
 
+**Transport:** WebSocket (`ws://<host>:3000/ws` by default) with a built-in dependency-free RFC 6455 client. TLS (`wss://`) is expected to be terminated by a proxy/load balancer in front of the server.
+
 ## 📦 Features
 *   **Performance:** written in pure C11 with minimal overhead.
 *   **Security:** Uses OpenSSL `libcrypto` and `libssl` for X25519/AES-GCM.
 *   **Portability:** Tested on macOS (Clang) and Linux (GCC).
+*   **Authenticated handshake (protocol v2):** pin the server's Ed25519 key to get
+    an authenticated, MITM-resistant handshake with header-AAD — no TLS required
+    for that guarantee (opt-in; v1 stays the default and unchanged).
+
+## 🔐 Authenticated handshake (v2)
+
+By default the client runs the v1 (unauthenticated) handshake, which relies on
+TLS at the edge for server authentication. Pinning the server's long-term
+Ed25519 identity switches to **protocol v2**: the client verifies the server's
+signature over the handshake transcript (and binds the frame header as AEAD AAD)
+**before** deriving any key, defeating an active man-in-the-middle even without
+TLS.
+
+```c
+adatp_client_t* client = adatp_client_create("127.0.0.1", 3000);
+
+// The server's 32-byte Ed25519 public key, obtained out of band (the server
+// logs its fingerprint at startup; the control plane can hand it to clients).
+uint8_t server_key[32] = { /* ... */ };
+adatp_client_set_server_key(client, server_key);   // <-- enables v2 + pinning
+
+adatp_client_connect(client);   // authenticated handshake; aborts on a bad key/signature
+```
+
+Verified against the Rust reference server end to end (`test/run_e2e_v2.sh`) and
+by golden-vector conformance (`ctest`, `test/conformance_v2.c`). Require v2
+server-side with `ADATP_MIN_PROTOCOL_VERSION=2`. See
+[`docs/spec/12-authenticated-handshake.md`](https://github.com/Ada-Transfer-Protocol/Server/blob/main/docs/spec/12-authenticated-handshake.md).
 
 ## 🚀 Installation & Build
 
@@ -31,7 +61,7 @@ gcc -I include -I/opt/homebrew/include -I/usr/local/include \
 
 int main() {
     // 1. Create Handle
-    adatp_client_t* client = adatp_client_create("127.0.0.1", 8444);
+    adatp_client_t* client = adatp_client_create("127.0.0.1", 3000);
     
     // 2. Connect
     if (adatp_client_connect(client) != 0) {
@@ -78,14 +108,26 @@ See `filetransfer_example.c` for a raw implementation of this packet constructio
 ## 📂 Examples
 
 *   **Chat CLI:** `example.c`
-    *   Implements `select()` to multiplex `stdin` (user input) and the TCP socket for real-time chat.
+    *   Implements `select()` to multiplex `stdin` (user input) and the WebSocket file descriptor for real-time chat.
 *   **File Sender:** `filetransfer_example.c`
     *   Demonstrates manually constructing the binary payloads required to upload a file to the room.
 
 ## 🔧 API Reference
 
 *   `adatp_client_create(host, port)`: Allocate client context.
-*   `adatp_client_connect(client)`: Perform TCP handshake + Crypto handshake.
+*   `adatp_client_connect(client)`: Connect over WebSocket (/ws) + crypto handshake.
 *   `adatp_client_authenticate(client, user, pass)`: Send auth packet.
 *   `adatp_client_send_text(client, msg)`: Helper for text messages.
 *   `adatp_client_send(client, type, payload, len)`: Send raw encrypted packet.
+
+## Language / locale
+
+Set the SDK language for user-facing strings (client-side metadata — the
+wire protocol is language-neutral). Default `en`; supported:
+`en tr it fr de zh ja hi ar`.
+
+```c
+adatp_client_t* client = adatp_client_create("127.0.0.1", 3000);
+adatp_client_set_locale(client, "tr");
+const char* lang = adatp_client_get_locale(client);
+```

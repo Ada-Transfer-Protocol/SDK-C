@@ -14,6 +14,7 @@ include_directories(include)
 set(SOURCES
     src/packet.c
     src/crypto.c
+    src/ws.c
     src/client.c
 )
 
@@ -24,3 +25,15 @@ target_link_libraries(adatp OpenSSL::SSL OpenSSL::Crypto)
 # Example executable
 add_executable(adatp_example examples/example.c)
 target_link_libraries(adatp_example adatp)
+
+# --- Tests ---
+enable_testing()
+
+# v2 handshake conformance (golden-vector replay; no server needed).
+add_executable(conformance_v2 test/conformance_v2.c)
+target_link_libraries(conformance_v2 adatp)
+add_test(NAME conformance_v2 COMMAND conformance_v2)
+
+# v2 end-to-end client (used by test/run_e2e_v2.sh against a live Rust server).
+add_executable(e2e_v2 test/e2e_v2.c)
+target_link_libraries(e2e_v2 adatp)
